@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet Map Homepage</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <!-- Leaflet MarkerCluster JavaScript -->
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- jQuery UI -->
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <!-- Leaflet Spiderfier -->
+    <script src="https://unpkg.com/leaflet.spiderfier/leaflet.spiderfier.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+
+        #date-picker-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
+            z-index: 999;
+        }
+
+        .ui-datepicker {
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="date-picker-container">
+        <div class="container">
+            <h5>Select Date Range:</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <input type="text" class="form-control" id="datepicker-start" placeholder="Start Date">
+                </div>
+                <div class="col-md-6">
+                    <input type="text" class="form-control" id="datepicker-end" placeholder="End Date">
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <button type="button" class="btn btn-primary" id="search-btn">Search</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // Define custom circle marker style
+        var greenCircle = {
+            radius: 12,
+            color: '#66FF33', // Lighter green outline
+            fillColor: '#00FF00', // Same green fill color
+            fillOpacity: 0.7 // 30% transparency
+        };
+
+
+        // Initialize the map centered over Calgary, Alberta, Canada
+        var map = L.map('map').setView([51.0486, -114.0708], 11);
+
+        // Add a tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var permitMarkers = L.markerClusterGroup(); // Marker cluster group for permit markers
+
+        // Function to load GeoJSON data from API and add to map based on date range
+        function loadData(startDate, endDate) {
+            fetch(`https://data.calgary.ca/resource/c2es-76ed.geojson?$where=issueddate between '${startDate}' and '${endDate}'`)
+                .then(response => response.json())
+                .then(data => {
+                    permitMarkers.clearLayers(); // Clear existing markers
+
+                    // Add markers for each feature
+                    data.features.forEach(feature => {
+                        var marker = L.circleMarker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], greenCircle)
+                            .bindPopup(`
+                                <b>Issued Date:</b> ${feature.properties.issueddate}<br>
+                                <b>Work Class Group:</b> ${feature.properties.workclassgroup}<br>
+                                <b>Contractor Name:</b> ${feature.properties.contractorname}<br>
+                                <b>Community Name:</b> ${feature.properties.communityname}<br>
+                                <b>Original Address:</b> ${feature.properties.originaladdress}
+                            `);
+                        permitMarkers.addLayer(marker);
+                    });
+                    map.addLayer(permitMarkers);
+                });
+        }
+
+        // Initialize date picker
+        $('#datepicker-start, #datepicker-end').datepicker({
+            dateFormat: 'yy-mm-dd',
+            changeMonth: true,
+            changeYear: true,
+        });
+
+        // Search button click event
+        document.getElementById('search-btn').addEventListener('click', function() {
+            var startDate = document.getElementById('datepicker-start').value;
+            var endDate = document.getElementById('datepicker-end').value;
+            // Check if both start date and end date are selected
+            if(startDate && endDate) {
+                loadData(startDate, endDate);
+            } else {
+                alert('Please select both start and end dates.');
+            }
+        });
+
+        // Adjust map size when window resizes
+        window.onresize = function() {
+            map.invalidateSize();
+        };
+
+        // Leaflet Spiderfier for handling overlapping markers
+        var oms = new OverlappingMarkerSpiderfier(map);
+
+        // Initialize Spiderfier
+        map.on('zoomend', function() {
+            var zoomLevel = map.getZoom();
+            if (zoomLevel < 13) {
+                // Enable clustering
+                permitMarkers.enableClustering();
+                // Disable spiderfier
+                oms.clearListeners('click');
+                oms.unspiderfy();
+            } else {
+                // Disable clustering
+                permitMarkers.disableClustering();
+                // Enable spiderfier
+                permitMarkers.eachLayer(function(marker) {
+                    oms.addMarker(marker);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
