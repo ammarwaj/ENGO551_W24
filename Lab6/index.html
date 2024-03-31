@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Line Simplification with Turf.js</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <!-- Leaflet JavaScript -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Leaflet Draw CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+
+  <!-- Leaflet Draw JavaScript -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+  <!-- Turf.js -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #3a3153; /* Purple background for the whole website */
+    }
+
+    #header {
+      background-color: #5f43b2; /* Purple header background color */
+      color: #fefdfd; /* Off White text color */
+      padding: 20px;
+      text-align: center;
+        border-top-left-radius: 20px;
+        border-top-right-radius: 20px;
+        border-bottom-left-radius: 20px;
+        border-bottom-right-radius: 20px;
+        margin: 20px;
+        margin-bottom: 0;
+        margin-left: 20px;
+        margin-right: 20px;
+    }
+
+    .button {
+      background-color: #b1aebb; /* Button background color */
+      color: #fefdfd; /* White text color */
+      border: none;
+      padding: 15px 20px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 10px 10px;
+      cursor: pointer;
+      border-radius: 20px; /* Rounded corners for the buttons */
+    }
+
+    #map-container {
+      border-radius: 20px;
+      background-color: #8c4dff; /* Matte purple color for the map */
+      margin: 20px; /* Margin to provide spacing around the map */
+      overflow: hidden;
+    }
+
+    #map {
+      height: 80vh;
+      border-radius: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>Simplify your shapes with Turf!</h1>
+  <div id="buttons">
+    <button class="button" onclick="toggleDraw()">Toggle Draw</button>
+    <button class="button" onclick="simplifyLine()">Simplify Line</button>
+    <button class="button" onclick="clearMap()">Clear Map</button>
+  </div>
+</div>
+
+<div id="map-container">
+  <div id="map"></div>
+</div>
+
+<script>
+  var map = L.map('map').setView([51.0486, -114.0708], 10); // Centered at Calgary, Alberta, Canada
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  var drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+
+  var drawControl = new L.Control.Draw(
+    {
+        edit: false // Disable editing toolbar
+    });
+map.addControl(drawControl);
+
+  var drawingEnabled = false;
+
+  function toggleDraw() {
+    if (drawingEnabled) {
+      map.removeControl(drawControl);
+      drawingEnabled = false;
+    } else {
+      map.addControl(drawControl);
+      drawingEnabled = true;
+    }
+  }
+
+  map.on(L.Draw.Event.CREATED, function (e) {
+    var layer = e.layer;
+    drawnItems.addLayer(layer);
+  });
+
+  function simplifyLine() {
+    var originalLine = drawnItems.toGeoJSON();
+    var simplifiedLine = turf.simplify(originalLine, { tolerance: 0.01, highQuality: false });
+    L.geoJSON(simplifiedLine, {
+      style: function (feature) {
+        return { color: 'red' }; // Change color as needed
+      }
+    }).addTo(map);
+  }
+
+  function clearMap() {
+    drawnItems.clearLayers();
+    map.eachLayer(function (layer) {
+      if (layer instanceof L.Polyline) {
+        map.removeLayer(layer);
+      }
+    });
+  }
+</script>
+
+</body>
+</html>
